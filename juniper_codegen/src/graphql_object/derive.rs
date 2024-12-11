@@ -6,12 +6,7 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::{ext::IdentExt as _, parse_quote, spanned::Spanned as _};
 
-use crate::common::{
-    diagnostic::{self, ResultExt as _},
-    field,
-    parse::TypeExt as _,
-    rename, scalar, SpanContainer,
-};
+use crate::common::{diagnostic::{self, ResultExt as _}, field, filter_attrs, parse::TypeExt as _, rename, scalar, SpanContainer};
 
 use super::{Attr, Definition, Query};
 
@@ -117,6 +112,10 @@ fn parse_field(field: &syn::Field, renaming: &rename::Policy) -> Option<field::D
         .map_err(diagnostic::emit_error)
         .ok()?;
 
+    let cfg_attrs = filter_attrs("cfg", &field.attrs)
+        .cloned()
+        .collect();
+
     if attr.ignore.is_some() {
         return None;
     }
@@ -150,5 +149,6 @@ fn parse_field(field: &syn::Field, renaming: &rename::Policy) -> Option<field::D
         arguments: None,
         has_receiver: false,
         is_async: false,
+        cfg_attributes: cfg_attrs,
     })
 }

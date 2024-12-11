@@ -204,6 +204,12 @@ pub(crate) struct Definition {
     ///
     /// [1]: https://spec.graphql.org/October2021#sec-Language.Fields
     pub(crate) is_async: bool,
+
+    /// Conditional compilation attributes indicating whether a field
+    /// should be present or not
+    ///
+    /// [1]: https://spec.graphql.org/October2021#sec-Language.Fields
+    pub(crate) cfg_attributes: Vec<syn::Attribute>,
 }
 
 impl Definition {
@@ -247,6 +253,7 @@ impl Definition {
         infer_result: bool,
         scalar: &scalar::Type,
     ) -> TokenStream {
+        let cfg_attr = &self.cfg_attributes;
         let args_marks = self
             .arguments
             .iter()
@@ -267,6 +274,7 @@ impl Definition {
 
         quote_spanned! { self.ty.span() =>
             #( #args_marks )*
+            #(#cfg_attr)*
             <#resolved_ty as ::juniper::marker::IsOutputType<#scalar>>::mark();
         }
     }
@@ -283,6 +291,7 @@ impl Definition {
         extract_stream_type: Option<&scalar::Type>,
     ) -> TokenStream {
         let (name, ty) = (&self.name, &self.ty);
+        let cfg_attr = &self.cfg_attributes;
         let mut ty = quote! { #ty };
         if let Some(scalar) = extract_stream_type {
             ty = quote! {
@@ -299,7 +308,7 @@ impl Definition {
             .flat_map(|args| args.iter().filter_map(MethodArgument::method_meta_tokens));
 
         quote! {
-            registry.field_convert::<#ty, _, Self::Context>(#name, info)
+            #(#cfg_attr)* registry.field_convert::<#ty, _, Self::Context>(#name, info)
                 #( #args )*
                 #description
                 #deprecated
@@ -319,7 +328,7 @@ impl Definition {
         scalar: &scalar::Type,
     ) -> TokenStream {
         let (name, mut ty, ident) = (&self.name, self.ty.clone(), &self.ident);
-
+        let cfg_attr = &self.cfg_attributes;
         let mut fut = if self.is_method() {
             let args = self
                 .arguments
@@ -342,6 +351,7 @@ impl Definition {
         }
 
         quote! {
+            #(#cfg_attr)*
             #name => {
                 ::juniper::futures::FutureExt::boxed(async move {
                     let res: #ty = #fut.await;

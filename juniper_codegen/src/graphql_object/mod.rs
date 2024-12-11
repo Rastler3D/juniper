@@ -370,7 +370,7 @@ impl<Operation: ?Sized + 'static> Definition<Operation> {
         let name = &self.name;
         let (impl_generics, where_clause) = self.impl_generics(false);
         let ty = &self.ty;
-        let fields = self.fields.iter().map(|f| &f.name);
+        let fields = self.fields.iter().map(|field::Definition{ name, cfg_attributes, .. }|  quote! { #(#cfg_attributes)* #name });
         let interfaces = self.interfaces.iter();
 
         quote! {
@@ -566,6 +566,7 @@ impl Definition<Query> {
             .iter()
             .map(|field| {
                 let (name, ty) = (&field.name, field.ty.clone());
+                let cfg_attr = &field.cfg_attributes;
 
                 let arguments = field
                     .arguments
@@ -586,6 +587,7 @@ impl Definition<Query> {
                     .collect::<Vec<_>>();
 
                 quote! {
+                    #(#cfg_attr)*
                     #[allow(deprecated, non_snake_case)]
                     #[automatically_derived]
                     impl #impl_generics ::juniper::macros::reflect::FieldMeta<
@@ -625,6 +627,7 @@ impl Definition<Query> {
             .iter()
             .map(|field| {
                 let (name, mut res_ty, ident) = (&field.name, field.ty.clone(), &field.ident);
+                let cfg_attr = &field.cfg_attributes;
 
                 let resolve = if field.is_async {
                     quote! {
@@ -662,6 +665,7 @@ impl Definition<Query> {
                 };
 
                 quote! {
+                    #(#cfg_attr)*
                     #[allow(deprecated, non_snake_case)]
                     #[automatically_derived]
                     impl #impl_generics ::juniper::macros::reflect::Field<
@@ -693,10 +697,10 @@ impl Definition<Query> {
     fn impl_async_field_tokens(&self) -> TokenStream {
         let (impl_ty, scalar) = (&self.ty, &self.scalar);
         let (impl_generics, where_clause) = self.impl_generics(true);
-
         self.fields
             .iter()
             .map(|field| {
+                let cfg_attr = &field.cfg_attributes;
                 let (name, mut res_ty, ident) = (&field.name, field.ty.clone(), &field.ident);
 
                 let mut res = if field.is_method() {
@@ -723,6 +727,7 @@ impl Definition<Query> {
                 let resolving_code = gen::async_resolving_code(Some(&res_ty));
 
                 quote! {
+                    #(#cfg_attr)*
                     #[allow(deprecated, non_snake_case)]
                     #[automatically_derived]
                     impl #impl_generics ::juniper::macros::reflect::AsyncField<
@@ -764,7 +769,9 @@ impl Definition<Query> {
 
         let fields_resolvers = self.fields.iter().map(|f| {
             let name = &f.name;
+            let cfg_attr = &f.cfg_attributes;
             quote! {
+                #(#cfg_attr)*
                 #name => {
                     ::juniper::macros::reflect::Field::<
                         #scalar,
@@ -831,7 +838,10 @@ impl Definition<Query> {
 
         let fields_resolvers = self.fields.iter().map(|f| {
             let name = &f.name;
+            let cfg_attr = &f.cfg_attributes;
+
             quote! {
+                #(#cfg_attr)*
                 #name => {
                     ::juniper::macros::reflect::AsyncField::<
                         #scalar,

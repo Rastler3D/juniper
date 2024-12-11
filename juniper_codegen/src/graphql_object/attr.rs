@@ -6,11 +6,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{ext::IdentExt as _, parse_quote, spanned::Spanned};
 
-use crate::common::{
-    diagnostic, field,
-    parse::{self, TypeExt as _},
-    path_eq_single, rename, scalar, SpanContainer,
-};
+use crate::common::{diagnostic, field, filter_attrs, parse::{self, TypeExt as _}, path_eq_single, rename, scalar, SpanContainer};
 
 use super::{Attr, Definition, Query};
 
@@ -154,6 +150,10 @@ fn parse_field(
         .filter(|attr| !path_eq_single(attr.path(), "graphql"))
         .collect();
 
+    let cfg_attr = filter_attrs("cfg", &method_attrs)
+        .cloned()
+        .collect();
+
     let attr = field::Attr::from_attrs("graphql", &method_attrs)
         .map_err(diagnostic::emit_error)
         .ok()?;
@@ -226,6 +226,7 @@ fn parse_field(
         arguments: Some(arguments),
         has_receiver: method.sig.receiver().is_some(),
         is_async: method.sig.asyncness.is_some(),
+        cfg_attributes: cfg_attr,
     })
 }
 

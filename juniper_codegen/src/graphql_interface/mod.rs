@@ -521,6 +521,10 @@ impl Definition {
 
         let suppress_dead_code = self.suppress_dead_code.as_ref().map(|(ident, fields)| {
             let const_gens = self.const_trait_generics();
+            let cfg_attrs = fields.iter().map(|f| filter_attrs("cfg", &f.attrs)
+                .cloned()
+                .collect::<Vec<_>>()
+            );
             let fields = fields.iter().map(|f| &f.ident);
 
             quote! {{
@@ -528,7 +532,7 @@ impl Definition {
                     let none = ::core::option::Option::<#ident #const_gens>::None;
                     match none {
                         ::core::option::Option::Some(unreachable) => {
-                            #( let _ = unreachable.#fields; )*
+                            #( #(#cfg_attrs)* let _ = unreachable.#fields; )*
                         }
                         ::core::option::Option::None => {}
                     }
@@ -761,8 +765,10 @@ impl Definition {
         let (_, ty_generics, _) = self.generics.split_for_impl();
 
         let fields_resolvers = self.fields.iter().map(|f| {
+            let cfg_attr = &f.cfg_attributes;
             let name = &f.name;
             Some(quote! {
+                #( #cfg_attr )*
                 #name => {
                     ::juniper::macros::reflect::Field::<
                         #scalar,
@@ -845,8 +851,10 @@ impl Definition {
         let (_, ty_generics, _) = self.generics.split_for_impl();
 
         let fields_resolvers = self.fields.iter().map(|f| {
+            let cfg_attr = &f.cfg_attributes;
             let name = &f.name;
             quote! {
+                #( #cfg_attr )*
                 #name => {
                     ::juniper::macros::reflect::AsyncField::<
                         #scalar,
@@ -907,7 +915,7 @@ impl Definition {
         let implements = &self.implements;
         let scalar = &self.scalar;
         let name = &self.name;
-        let fields = self.fields.iter().map(|f| &f.name);
+        let fields = self.fields.iter().map(|field::Definition{ name, cfg_attributes, .. } | quote! { #(#cfg_attributes)* #name });
 
         let generics = self.impl_generics(false);
         let (impl_generics, _, where_clause) = generics.split_for_impl();
@@ -979,6 +987,7 @@ impl Definition {
             .map(|field| {
                 let field_name = &field.name;
                 let mut return_ty = field.ty.clone();
+                let cfg_attr = &field.cfg_attributes;
                 generics.replace_type_with_defaults(&mut return_ty);
 
                 let (args_tys, args_names): (Vec<_>, Vec<_>) = field
@@ -992,6 +1001,7 @@ impl Definition {
                     .unzip();
 
                 quote! {
+                    #(#cfg_attr)*
                     #[allow(non_snake_case)]
                     #[automatically_derived]
                     impl #impl_generics ::juniper::macros::reflect::FieldMeta<
@@ -1053,6 +1063,7 @@ impl Definition {
         self.fields
             .iter()
             .map(|field| {
+                let cfg_attr = &field.cfg_attributes;
                 let field_name = &field.name;
                 let mut return_ty = field.ty.clone();
                 generics.replace_type_with_defaults(&mut return_ty);
@@ -1066,6 +1077,7 @@ impl Definition {
                 });
 
                 quote_spanned! { field.ident.span() =>
+                    #(#cfg_attr)*
                     #[allow(non_snake_case)]
                     #[automatically_derived]
                     impl #impl_generics ::juniper::macros::reflect::Field<
@@ -1133,6 +1145,7 @@ impl Definition {
         self.fields
             .iter()
             .map(|field| {
+                let cfg_attr = &field.cfg_attributes;
                 let field_name = &field.name;
                 let mut return_ty = field.ty.clone();
                 generics.replace_type_with_defaults(&mut return_ty);
@@ -1146,6 +1159,7 @@ impl Definition {
                 });
 
                 quote_spanned! { field.ident.span() =>
+                    #(#cfg_attr)*
                     #[allow(non_snake_case)]
                     #[automatically_derived]
                     impl #impl_generics ::juniper::macros::reflect::AsyncField<

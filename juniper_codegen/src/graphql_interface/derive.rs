@@ -4,7 +4,7 @@ use proc_macro2::TokenStream;
 use quote::ToTokens as _;
 use syn::{ext::IdentExt as _, parse_quote, spanned::Spanned};
 
-use crate::common::{diagnostic, field, parse::TypeExt as _, rename, scalar, SpanContainer};
+use crate::common::{diagnostic, field, filter_attrs, parse::TypeExt as _, rename, scalar, SpanContainer};
 
 use super::{attr::err_unnamed_field, enum_idents, Attr, Definition};
 
@@ -121,6 +121,10 @@ fn parse_field(field: &syn::Field, renaming: &rename::Policy) -> Option<field::D
         .map_err(diagnostic::emit_error)
         .ok()?;
 
+    let cfg_attrs = filter_attrs("cfg", &field.attrs)
+        .cloned()
+        .collect();
+
     if attr.ignore.is_some() {
         return None;
     }
@@ -152,5 +156,6 @@ fn parse_field(field: &syn::Field, renaming: &rename::Policy) -> Option<field::D
         arguments: None,
         has_receiver: false,
         is_async: false,
+        cfg_attributes: cfg_attrs,
     })
 }
